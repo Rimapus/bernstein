@@ -1,0 +1,30 @@
+- name: Anonymous access is challenged
+  ansible.builtin.uri:
+    url: "https://{{ registry_host }}:{{ registry_port }}/v2/"
+    ca_path: "{{ registry_cert_dir }}/ca.crt"
+    status_code: 401
+  register: registry_anonymous
+  until: registry_anonymous.status == 401
+  retries: 10
+  delay: 2
+
+- name: Puller can list the catalog
+  ansible.builtin.uri:
+    url: "https://{{ registry_host }}:{{ registry_port }}/v2/_catalog"
+    ca_path: "{{ registry_cert_dir }}/ca.crt"
+    url_username: puller
+    url_password: "{{ registry_puller_password }}"
+    force_basic_auth: true
+    status_code: 200
+  no_log: true
+
+- name: Puller cannot push
+  ansible.builtin.uri:
+    url: "https://{{ registry_host }}:{{ registry_port }}/v2/smoketest/blobs/uploads/"
+    method: POST
+    ca_path: "{{ registry_cert_dir }}/ca.crt"
+    url_username: puller
+    url_password: "{{ registry_puller_password }}"
+    force_basic_auth: true
+    status_code: 403
+  no_log: true

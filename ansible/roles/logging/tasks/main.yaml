@@ -1,0 +1,28 @@
+---
+- name: Add the grafana chart repository
+  kubernetes.core.helm_repository:
+    name: grafana
+    repo_url: https://grafana.github.io/helm-charts
+
+- name: Install Loki
+  kubernetes.core.helm:
+    kubeconfig: /etc/kubernetes/admin.conf
+    name: loki
+    chart_ref: grafana/loki
+    chart_version: "{{ logging_loki_chart_version }}"
+    release_namespace: "{{ logging_namespace }}"
+    create_namespace: true
+    update_repo_cache: true
+    values: "{{ lookup('ansible.builtin.template', 'loki-values.yaml.j2') | from_yaml }}"
+    wait: true
+    wait_timeout: 10m
+
+- name: Install Alloy
+  kubernetes.core.helm:
+    kubeconfig: /etc/kubernetes/admin.conf
+    name: alloy
+    chart_ref: grafana/alloy
+    chart_version: "{{ logging_alloy_chart_version }}"
+    release_namespace: "{{ logging_namespace }}"
+    values: "{{ lookup('ansible.builtin.template', 'alloy-values.yaml.j2') | from_yaml }}"
+    wait: true

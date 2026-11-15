@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: poll-app
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: poll
+data:
+  redis.conf: |
+    bind 0.0.0.0
+    protected-mode yes
+    port 6379
+    tcp-keepalive 300
+    timeout 0
+    loglevel notice
+    dir /data
+    appendonly yes
+    appendfsync everysec
+    save ""
+    maxmemory 384mb
+    maxmemory-policy noeviction

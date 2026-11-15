@@ -1,0 +1,5 @@
+server = "https://{{ registry_host }}:{{ registry_port }}"
+
+[host."https://{{ registry_host }}:{{ registry_port }}"]
+  capabilities = ["pull", "resolve"]
+  ca = "/etc/containerd/certs.d/{{ registry_host }}:{{ registry_port }}/ca.crt"

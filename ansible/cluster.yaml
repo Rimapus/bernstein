@@ -1,0 +1,21 @@
+---
+- name: Prepare Kubernetes nodes
+  hosts: k8s
+  become: true
+  roles:
+    - common
+
+- name: Bootstrap control plane
+  hosts: control_plane
+  become: true
+  roles:
+    - control_plane
+
+- name: Join workers
+  hosts: workers
+  become: true
+  roles:
+    - worker
+
+- name: Install the default storage class
+  ansible.builtin.import_playbook: storage.yaml

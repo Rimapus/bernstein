@@ -1,0 +1,29 @@
+[Unit]
+Description=Zot OCI Distribution Registry
+Documentation=https://zotregistry.dev
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/zot serve /etc/zot/config.json
+Restart=on-failure
+RestartSec=2s
+User=zot
+Group=zot
+LimitNOFILE=500000
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+ReadWritePaths=/var/lib/zot /var/log/zot
+MemoryMax=1536M
+
+[Install]
+WantedBy=multi-user.target

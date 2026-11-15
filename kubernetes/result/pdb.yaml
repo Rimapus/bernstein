@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: result
+  namespace: poll-app
+  labels:
+    app.kubernetes.io/name: result
+    app.kubernetes.io/part-of: poll
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: result

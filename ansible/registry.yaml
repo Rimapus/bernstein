@@ -1,0 +1,6 @@
+---
+- name: Install the private registry (zot)
+  hosts: registry
+  become: true
+  roles:
+    - registry

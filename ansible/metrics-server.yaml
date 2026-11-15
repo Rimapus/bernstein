@@ -1,0 +1,7 @@
+---
+- name: Install metrics-server
+  hosts: control_plane
+  become: true
+  roles:
+    - helm
+    - metrics_server

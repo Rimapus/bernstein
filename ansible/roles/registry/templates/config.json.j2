@@ -1,0 +1,59 @@
+{
+  "distSpecVersion": "1.1.1",
+  "storage": {
+    "rootDirectory": "{{ registry_data_dir }}",
+    "dedupe": true,
+    "gc": true,
+    "gcDelay": "1h",
+    "gcInterval": "6h"
+  },
+  "http": {
+    "address": "0.0.0.0",
+    "port": "{{ registry_port }}",
+    "realm": "bernstein-registry",
+    "compat": ["docker2s2"],
+    "tls": {
+      "cert": "{{ registry_cert_dir }}/server.crt",
+      "key": "{{ registry_cert_dir }}/server.key"
+    },
+    "auth": {
+      "htpasswd": {
+        "path": "{{ registry_conf_dir }}/htpasswd"
+      },
+      "failDelay": 5
+    },
+    "accessControl": {
+      "adminPolicy": {
+        "users": ["admin"],
+        "actions": ["read", "create", "update", "delete"]
+      },
+      "repositories": {
+        "**": {
+          "policies": [
+            {
+              "users": ["pusher"],
+              "actions": ["read", "create", "update"]
+            },
+            {
+              "users": ["puller"],
+              "actions": ["read"]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "log": {
+    "level": "info",
+    "output": "{{ registry_log_dir }}/zot.log",
+    "audit": "{{ registry_log_dir }}/zot-audit.log"
+  },
+  "extensions": {
+    "search": {
+      "enable": true
+    },
+    "ui": {
+      "enable": true
+    }
+  }
+}

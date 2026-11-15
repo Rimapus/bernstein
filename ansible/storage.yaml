@@ -1,0 +1,6 @@
+---
+- name: Install the default storage class
+  hosts: control_plane
+  become: true
+  roles:
+    - storage

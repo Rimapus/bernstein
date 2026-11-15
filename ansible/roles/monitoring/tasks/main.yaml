@@ -1,0 +1,49 @@
+---
+- name: Check the Grafana admin password
+  ansible.builtin.assert:
+    that: monitoring_grafana_admin_password | length > 0
+    fail_msg: GRAFANA_ADMIN_PASSWORD is empty, set it in .env
+    quiet: true
+
+- name: Create the monitoring namespace
+  kubernetes.core.k8s:
+    kubeconfig: /etc/kubernetes/admin.conf
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ monitoring_namespace }}"
+
+- name: Create the Grafana admin secret
+  kubernetes.core.k8s:
+    kubeconfig: /etc/kubernetes/admin.conf
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: Opaque
+      metadata:
+        name: grafana-admin
+        namespace: "{{ monitoring_namespace }}"
+      stringData:
+        admin-user: admin
+        admin-password: "{{ monitoring_grafana_admin_password }}"
+  no_log: true
+
+- name: Add the prometheus-community chart repository
+  kubernetes.core.helm_repository:
+    name: prometheus-community
+    repo_url: https://prometheus-community.github.io/helm-charts
+
+- name: Install kube-prometheus-stack
+  kubernetes.core.helm:
+    kubeconfig: /etc/kubernetes/admin.conf
+    name: kube-prometheus-stack
+    chart_ref: prometheus-community/kube-prometheus-stack
+    chart_version: "{{ monitoring_chart_version }}"
+    release_namespace: "{{ monitoring_namespace }}"
+    update_repo_cache: true
+    values: "{{ lookup('ansible.builtin.template', 'values.yaml.j2') | from_yaml }}"
+    wait: true
+    wait_timeout: 10m

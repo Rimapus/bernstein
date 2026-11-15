@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: poll
+  namespace: poll-app
+  labels:
+    app.kubernetes.io/name: poll
+    app.kubernetes.io/part-of: poll
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - poll.bernstein.local
+        - poll.rimapus.fr
+      secretName: bernstein-tls
+  rules:
+    - host: poll.bernstein.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: poll
+                port:
+                  name: http
+    - host: poll.rimapus.fr
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: poll
+                port:
+                  name: http

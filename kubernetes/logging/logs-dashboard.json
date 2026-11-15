@@ -1,0 +1,176 @@
+{
+  "uid": "poll-logs",
+  "title": "Poll application logs",
+  "tags": [
+    "poll",
+    "logs"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Request volume per service",
+      "description": "Requests per minute from the ingress-nginx access logs.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (upstream) (count_over_time({namespace=\"ingress-nginx\"} | regexp `\" (?P<status>\\d{3}) \\d+ \"[^\"]*\" \"[^\"]*\" \\d+ [\\d.]+ \\[(?P<upstream>poll-app-[^\\]]+)\\]` [1m]))",
+          "legendFormat": "{{upstream}}",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "HTTP error rate per service",
+      "description": "Share of 5xx responses in the ingress-nginx access logs.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "(sum by (upstream) (count_over_time({namespace=\"ingress-nginx\"} | regexp `\" (?P<status>\\d{3}) \\d+ \"[^\"]*\" \"[^\"]*\" \\d+ [\\d.]+ \\[(?P<upstream>poll-app-[^\\]]+)\\]` | status=~\"5..\" [5m])) or 0 * sum by (upstream) (count_over_time({namespace=\"ingress-nginx\"} | regexp `\" (?P<status>\\d{3}) \\d+ \"[^\"]*\" \"[^\"]*\" \\d+ [\\d.]+ \\[(?P<upstream>poll-app-[^\\]]+)\\]` [5m]))) / sum by (upstream) (count_over_time({namespace=\"ingress-nginx\"} | regexp `\" (?P<status>\\d{3}) \\d+ \"[^\"]*\" \"[^\"]*\" \\d+ [\\d.]+ \\[(?P<upstream>poll-app-[^\\]]+)\\]` [5m]))",
+          "legendFormat": "{{upstream}}",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Log lines per workload",
+      "description": "Every poll-app workload (poll, worker, result, redis, postgres) ships logs.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (app) (count_over_time({namespace=\"poll-app\"} [1m]))",
+          "legendFormat": "{{app}}",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Error lines per workload",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (app) (count_over_time({namespace=\"poll-app\"} |~ `(?i)(error|exception|fatal|panic)` [1m]))",
+          "legendFormat": "{{app}}",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "logs",
+      "title": "Error logs",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "expr": "{namespace=\"poll-app\"} |~ `(?i)(error|exception|fatal|panic)`",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ]
+    }
+  ]
+}

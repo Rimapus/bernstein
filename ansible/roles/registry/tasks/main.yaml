@@ -1,0 +1,125 @@
+- name: Check registry passwords
+  ansible.builtin.assert:
+    that:
+      - registry_admin_password | length > 0
+      - registry_pusher_password | length > 0
+      - registry_puller_password | length > 0
+    fail_msg: Set REGISTRY_ADMIN/PUSHER/PULLER_PASSWORD (see .env.example).
+    quiet: true
+  no_log: true
+
+- name: Install packages
+  ansible.builtin.apt:
+    name: [ca-certificates, curl, ufw, python3-passlib, python3-bcrypt, python3-cryptography]
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create zot group
+  ansible.builtin.group:
+    name: zot
+    system: true
+
+- name: Create zot user
+  ansible.builtin.user:
+    name: zot
+    group: zot
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+
+- name: Create configuration directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ registry_conf_dir }}"
+    - "{{ registry_cert_dir }}"
+
+- name: Create data and log directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: zot
+    group: zot
+    mode: "0750"
+  loop:
+    - "{{ registry_data_dir }}"
+    - "{{ registry_log_dir }}"
+
+- name: Create log files owned by zot
+  ansible.builtin.file:
+    path: "{{ registry_log_dir }}/{{ item }}"
+    state: touch
+    owner: zot
+    group: zot
+    mode: "0640"
+    modification_time: preserve
+    access_time: preserve
+  loop: [zot.log, zot-audit.log]
+
+- name: Download zot binary
+  ansible.builtin.get_url:
+    url: "{{ registry_zot_url }}"
+    dest: /usr/bin/zot
+    checksum: "sha256:{{ registry_zot_sha256 }}"
+    mode: "0755"
+  notify: Restart zot
+
+- name: Generate TLS material
+  ansible.builtin.include_tasks: certs.yaml
+
+- name: Write htpasswd accounts
+  community.general.htpasswd:
+    path: "{{ registry_conf_dir }}/htpasswd"
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    crypt_scheme: bcrypt
+    owner: root
+    group: zot
+    mode: "0640"
+  loop:
+    - name: admin
+      password: "{{ registry_admin_password }}"
+    - name: pusher
+      password: "{{ registry_pusher_password }}"
+    - name: puller
+      password: "{{ registry_puller_password }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+- name: Write zot configuration
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: "{{ registry_conf_dir }}/config.json"
+    owner: root
+    group: zot
+    mode: "0640"
+    validate: /usr/bin/zot verify %s
+  notify: Restart zot
+
+- name: Install systemd unit
+  ansible.builtin.copy:
+    src: zot.service
+    dest: /etc/systemd/system/zot.service
+    mode: "0644"
+  notify: Restart zot
+
+- name: Enable and start zot
+  ansible.builtin.systemd_service:
+    name: zot
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Configure firewall
+  ansible.builtin.include_tasks: firewall.yaml
+
+- name: Apply pending restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify registry
+  ansible.builtin.include_tasks: verify.yaml

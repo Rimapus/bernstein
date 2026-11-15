@@ -1,0 +1,6 @@
+---
+- name: Registry
+  ansible.builtin.import_playbook: registry.yaml
+
+- name: Cluster
+  ansible.builtin.import_playbook: cluster.yaml

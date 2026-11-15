@@ -1,0 +1,113 @@
+- name: Load kernel modules at boot
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: "0644"
+
+- name: Load kernel modules now
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: [overlay, br_netfilter]
+
+- name: Set networking sysctls
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: "1"
+    sysctl_file: /etc/sysctl.d/99-k8s.conf
+    reload: true
+  loop:
+    - net.ipv4.ip_forward
+    - net.bridge.bridge-nf-call-iptables
+    - net.bridge.bridge-nf-call-ip6tables
+
+- name: Install apt prerequisites
+  ansible.builtin.apt:
+    name: [ca-certificates, curl, gpg]
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Remove legacy one-line apt sources
+  ansible.builtin.file:
+    path: "/etc/apt/sources.list.d/{{ item }}"
+    state: absent
+  loop: [docker.list, kubernetes.list]
+
+- name: Add Docker apt repository (containerd.io)
+  ansible.builtin.deb822_repository:
+    name: docker
+    uris: https://download.docker.com/linux/debian
+    suites: "{{ ansible_facts['distribution_release'] }}"
+    components: [stable]
+    signed_by: https://download.docker.com/linux/debian/gpg
+
+- name: Add Kubernetes apt repository
+  ansible.builtin.deb822_repository:
+    name: kubernetes
+    uris: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_minor }}/deb/"
+    suites: /
+    signed_by: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_minor }}/deb/Release.key"
+
+- name: Install containerd and Kubernetes packages
+  ansible.builtin.apt:
+    name:
+      - "containerd.io={{ containerd_pkg_version }}"
+      - "kubelet={{ k8s_pkg_version }}"
+      - "kubeadm={{ k8s_pkg_version }}"
+      - "kubectl={{ k8s_pkg_version }}"
+      - cri-tools
+    update_cache: true
+    allow_downgrade: true
+
+- name: Hold containerd and Kubernetes packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: [containerd.io, kubelet, kubeadm, kubectl, cri-tools]
+
+- name: Write containerd config
+  ansible.builtin.template:
+    src: containerd-config.toml.j2
+    dest: /etc/containerd/config.toml
+    mode: "0644"
+  notify: Restart containerd
+
+- name: Enable containerd and kubelet
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [containerd, kubelet]
+
+- name: Apply containerd changes before going further
+  ansible.builtin.meta: flush_handlers
+
+- name: Install registry CA for containerd
+  when: registry_host is defined
+  block:
+    - name: Fetch registry CA certificate
+      ansible.builtin.slurp:
+        src: "{{ registry_ca_path }}"
+      delegate_to: "{{ groups['registry'][0] }}"
+      run_once: true
+      register: common_registry_ca
+
+    - name: Create registry certs.d directory
+      ansible.builtin.file:
+        path: "/etc/containerd/certs.d/{{ registry_host }}:{{ registry_port }}"
+        state: directory
+        mode: "0755"
+
+    - name: Install registry CA certificate
+      ansible.builtin.copy:
+        dest: "/etc/containerd/certs.d/{{ registry_host }}:{{ registry_port }}/ca.crt"
+        content: "{{ common_registry_ca.content | b64decode }}"
+        mode: "0644"
+
+    - name: Configure registry host for containerd
+      ansible.builtin.template:
+        src: containerd-hosts.toml.j2
+        dest: "/etc/containerd/certs.d/{{ registry_host }}:{{ registry_port }}/hosts.toml"
+        mode: "0644"

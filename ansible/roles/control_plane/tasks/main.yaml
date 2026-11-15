@@ -1,0 +1,88 @@
+- name: Write kubeadm configuration
+  ansible.builtin.template:
+    src: kubeadm-config.yaml.j2
+    dest: /etc/kubernetes/kubeadm-config.yaml
+    mode: "0600"
+
+- name: Install build tools (docker, buildx, make, git, python3-kubernetes)
+  ansible.builtin.apt:
+    name: [docker-ce, docker-ce-cli, docker-buildx-plugin, make, git, python3-kubernetes]
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Fetch registry CA certificate
+  ansible.builtin.slurp:
+    src: "{{ registry_ca_path }}"
+  delegate_to: "{{ groups['registry'][0] }}"
+  run_once: true
+  register: control_plane_registry_ca
+
+- name: Create Docker certs directory for registry
+  ansible.builtin.file:
+    path: "/etc/docker/certs.d/{{ registry_host }}:{{ registry_port }}"
+    state: directory
+    mode: "0755"
+
+- name: Configure Docker to trust registry CA
+  ansible.builtin.copy:
+    content: "{{ control_plane_registry_ca.content | b64decode }}"
+    dest: "/etc/docker/certs.d/{{ registry_host }}:{{ registry_port }}/ca.crt"
+    mode: "0644"
+  run_once: true
+  delegate_to: "{{ groups['control_plane'][0] }}"
+  notify: Restart docker
+
+- name: Ensure the Ansible user can use Docker
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true
+
+- name: Login to private registry
+  community.docker.docker_login:
+    registry_url: "https://{{ registry_host }}:{{ registry_port }}"
+    username: "pusher"
+    password: "{{ registry_pusher_password }}"
+    config_path: "/home/{{ ansible_user }}/.docker/config.json"
+  become: true
+  become_user: root
+  no_log: true
+
+- name: Fix docker config ownership
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/.docker"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    recurse: true
+
+- name: Initialize control plane
+  ansible.builtin.command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: Create kubeconfig directory for {{ ansible_user }}
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0700"
+
+- name: Install kubeconfig for {{ ansible_user }}
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/home/{{ ansible_user }}/.kube/config"
+    remote_src: true
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0600"
+
+- name: Copy kubeconfig to the Ansible machine
+  ansible.builtin.fetch:
+    src: /etc/kubernetes/admin.conf
+    dest: "{{ kubeconfig_local_path }}"
+    flat: true
+
+- name: Install Calico
+  ansible.builtin.include_tasks: calico.yaml

@@ -1,0 +1,64 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: poll
+  namespace: poll-app
+  labels:
+    app.kubernetes.io/part-of: poll
+spec:
+  groups:
+    - name: poll.rules
+      rules:
+        - alert: PollHighErrorRate
+          expr: |
+            sum(rate(nginx_ingress_controller_requests{exported_namespace="poll-app",ingress="poll",status=~"5.."}[5m]))
+              / sum(rate(nginx_ingress_controller_requests{exported_namespace="poll-app",ingress="poll"}[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: More than 5% of poll requests fail
+            description: '{{ $value | humanizePercentage }} of the requests to poll return 5xx.'
+        - alert: PollHighLatency
+          expr: |
+            histogram_quantile(0.99,
+              sum by (le) (rate(nginx_ingress_controller_request_duration_seconds_bucket{exported_namespace="poll-app",ingress="poll"}[5m]))
+            ) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Poll p99 latency above 500ms
+            description: 'Poll p99 latency is {{ $value | humanizeDuration }}.'
+        - alert: VoteQueueBacklog
+          expr: max(redis_key_size{key="votes"}) > 100
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Votes are waiting in Redis
+            description: '{{ $value }} votes are queued: the worker is down or too slow.'
+        - alert: WorkloadUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="poll-app",deployment=~"poll|worker|result"} < 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: '{{ $labels.deployment }} has no available replica'
+            description: 'Deployment {{ $labels.deployment }} has had no available replica for 2 minutes.'
+        - alert: RedisDown
+          expr: max(redis_up) < 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: Redis is unreachable
+            description: The redis exporter cannot reach Redis; votes cannot be recorded.
+        - alert: PostgresDown
+          expr: max(pg_up) < 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: PostgreSQL is unreachable
+            description: The postgres exporter cannot reach PostgreSQL; votes cannot be stored or read.

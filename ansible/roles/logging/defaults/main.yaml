@@ -1,0 +1,7 @@
+---
+logging_namespace: logging
+logging_loki_chart_version: "7.5.0"
+logging_alloy_chart_version: "1.14.3"
+
+logging_retention: 168h
+logging_storage_size: 5Gi

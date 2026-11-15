@@ -1,0 +1,19 @@
+---
+- name: Add the metrics-server chart repository
+  kubernetes.core.helm_repository:
+    name: metrics-server
+    repo_url: https://kubernetes-sigs.github.io/metrics-server/
+
+- name: Install metrics-server
+  kubernetes.core.helm:
+    kubeconfig: /etc/kubernetes/admin.conf
+    name: metrics-server
+    chart_ref: metrics-server/metrics-server
+    chart_version: "{{ metrics_server_chart_version }}"
+    release_namespace: kube-system
+    update_repo_cache: true
+    values:
+      # kubeadm kubelets serve a self-signed certificate.
+      args:
+        - --kubelet-insecure-tls
+    wait: true

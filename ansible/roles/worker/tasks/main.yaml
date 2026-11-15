@@ -1,0 +1,25 @@
+- name: Check whether the node already joined
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: worker_kubelet_conf
+
+- name: Join the cluster
+  when: not worker_kubelet_conf.stat.exists
+  block:
+    - name: Create join command (short-lived token)
+      ansible.builtin.command: "kubeadm token create --print-join-command --ttl {{ join_token_ttl }}"
+      delegate_to: "{{ groups['control_plane'][0] }}"
+      register: worker_join_command
+      changed_when: false
+
+    - name: Run kubeadm join
+      ansible.builtin.command: "{{ worker_join_command.stdout }}"
+      args:
+        creates: /etc/kubernetes/kubelet.conf
+
+- name: Wait for the node to be Ready
+  ansible.builtin.command: "kubectl wait --for=condition=Ready --timeout=180s node/{{ inventory_hostname }}"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  delegate_to: "{{ groups['control_plane'][0] }}"
+  changed_when: false

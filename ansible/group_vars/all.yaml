@@ -1,0 +1,25 @@
+# Kubernetes packages: minor selects the apt repository, version pins the patch.
+k8s_minor: "1.37"
+k8s_version: "1.37.1"
+k8s_pkg_version: "{{ k8s_version }}-1.1"
+
+containerd_pkg_version: "2.4.2-2~debian.13~trixie"
+
+cp_endpoint: "{{ hostvars[groups['control_plane'][0]].ansible_host }}:6443"
+pod_cidr: "10.244.0.0/16"
+service_cidr: "10.96.0.0/12"
+
+calico_version: "v3.33.0"
+calico_manifests: "https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests"
+
+registry_host: "{{ hostvars[groups['registry'][0]].ansible_host }}"
+registry_port: 5000
+registry_ca_path: /etc/zot/certs/ca.crt
+
+registry_admin_password: "{{ lookup('env', 'REGISTRY_ADMIN_PASSWORD') }}"
+registry_pusher_password: "{{ lookup('env', 'REGISTRY_PUSHER_PASSWORD') }}"
+registry_puller_password: "{{ lookup('env', 'REGISTRY_PULLER_PASSWORD') }}"
+
+join_token_ttl: 15m
+
+kubeconfig_local_path: "{{ lookup('env', 'HOME') }}/.kube/bernstein.conf"

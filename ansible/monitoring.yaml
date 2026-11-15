@@ -1,0 +1,7 @@
+---
+- name: Install the metrics stack
+  hosts: control_plane
+  become: true
+  roles:
+    - helm
+    - monitoring

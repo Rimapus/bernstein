@@ -1,0 +1,27 @@
+---
+ingress_chart_version: "4.15.1"
+ingress_namespace: ingress-nginx
+
+ingress_domain: bernstein.local
+
+# Internal test names and public Cloudflare Tunnel names. The certificate
+# covers both; cloudflared connects to ingress-nginx over HTTPS.
+ingress_public_hosts:
+  - poll.rimapus.fr
+  - result.rimapus.fr
+ingress_hosts:
+  - "poll.{{ ingress_domain }}"
+  - "result.{{ ingress_domain }}"
+  - "{{ ingress_public_hosts[0] }}"
+  - "{{ ingress_public_hosts[1] }}"
+
+# Self-signed CA and wildcard certificate for the application hosts.
+ingress_cert_dir: /etc/kubernetes/ingress-certs
+ingress_tls_secret: bernstein-tls
+ingress_tls_namespace: poll-app
+ingress_ca_days: 3650
+ingress_cert_days: 365
+# true regenerates the CA and certificate; browsers must then trust the new CA.
+ingress_force_certs: false
+
+ingress_ca_local_path: "{{ lookup('env', 'HOME') }}/.kube/bernstein-ingress-ca.crt"

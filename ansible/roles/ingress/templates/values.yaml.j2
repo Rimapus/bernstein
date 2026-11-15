@@ -1,0 +1,21 @@
+controller:
+  kind: DaemonSet
+  hostPort:
+    enabled: true
+  service:
+    type: ClusterIP
+  ingressClassResource:
+    name: nginx
+    default: true
+  config:
+    use-forwarded-headers: "false"
+    ssl-redirect: "true"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  metrics:
+    enabled: true

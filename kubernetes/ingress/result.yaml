@@ -1,0 +1,45 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: result
+  namespace: poll-app
+  labels:
+    app.kubernetes.io/name: result
+    app.kubernetes.io/part-of: poll
+  annotations:
+    # Socket.IO long-polling: every request of a session must hit the same pod.
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/session-cookie-name: result-affinity
+    nginx.ingress.kubernetes.io/session-cookie-secure: "true"
+    nginx.ingress.kubernetes.io/session-cookie-samesite: Strict
+    # Keep long-lived Socket.IO connections open through the tunnel.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - result.bernstein.local
+        - result.rimapus.fr
+      secretName: bernstein-tls
+  rules:
+    - host: result.bernstein.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: result
+                port:
+                  name: http
+    - host: result.rimapus.fr
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: result
+                port:
+                  name: http

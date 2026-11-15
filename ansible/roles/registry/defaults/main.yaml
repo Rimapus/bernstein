@@ -1,0 +1,20 @@
+registry_zot_version: v2.1.22
+registry_zot_sha256: 33b9b5bfe05d6788c076de951a01920477dbd6395c330146e23cc2340073e52e
+registry_zot_url: "https://github.com/project-zot/zot/releases/download/{{ registry_zot_version }}/zot-linux-amd64"
+
+registry_conf_dir: /etc/zot
+registry_cert_dir: "{{ registry_conf_dir }}/certs"
+registry_data_dir: /var/lib/zot
+registry_log_dir: /var/log/zot
+
+# Extra DNS name in the server certificate (registry_host is always included).
+registry_dns: registry-2
+# Allow list for firewall (cluster network only)
+registry_allowed_cidrs:
+  - "10.10.80.0/24"
+
+registry_ca_days: 3650
+registry_cert_days: 730
+# true regenerates the CA and server certificate (e.g. registry_host changed);
+# every client must then trust the new CA (re-run the cluster playbook).
+registry_force_certs: false

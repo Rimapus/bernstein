@@ -1,0 +1,18 @@
+alloy:
+  configMap:
+    content: {{ lookup('ansible.builtin.file', 'config.alloy') | to_json }}
+  mounts:
+    varlog: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+controller:
+  type: daemonset
+  # Also collect the logs of the control plane pods.
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule

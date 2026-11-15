@@ -1,0 +1,49 @@
+---
+- name: Generate the ingress certificates
+  ansible.builtin.include_tasks: certs.yaml
+
+- name: Add the ingress-nginx chart repository
+  kubernetes.core.helm_repository:
+    name: ingress-nginx
+    repo_url: https://kubernetes.github.io/ingress-nginx
+
+- name: Install ingress-nginx
+  kubernetes.core.helm:
+    kubeconfig: /etc/kubernetes/admin.conf
+    name: ingress-nginx
+    chart_ref: ingress-nginx/ingress-nginx
+    chart_version: "{{ ingress_chart_version }}"
+    release_namespace: "{{ ingress_namespace }}"
+    create_namespace: true
+    update_repo_cache: true
+    values: "{{ lookup('ansible.builtin.template', 'values.yaml.j2') | from_yaml }}"
+    wait: true
+
+- name: Read the ingress certificate
+  ansible.builtin.slurp:
+    src: "{{ ingress_cert_dir }}/{{ item }}"
+  loop: [tls.crt, tls.key]
+  register: ingress_cert_files
+  no_log: true
+
+- name: Create the TLS secret
+  kubernetes.core.k8s:
+    kubeconfig: /etc/kubernetes/admin.conf
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: kubernetes.io/tls
+      metadata:
+        name: "{{ ingress_tls_secret }}"
+        namespace: "{{ ingress_tls_namespace }}"
+      data:
+        tls.crt: "{{ ingress_cert_files.results[0].content }}"
+        tls.key: "{{ ingress_cert_files.results[1].content }}"
+  no_log: true
+
+- name: Copy the ingress CA to the Ansible machine
+  ansible.builtin.fetch:
+    src: "{{ ingress_cert_dir }}/ca.crt"
+    dest: "{{ ingress_ca_local_path }}"
+    flat: true

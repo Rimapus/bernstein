@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: poll-config
+  namespace: poll-app
+  labels:
+    app.kubernetes.io/name: poll
+    app.kubernetes.io/part-of: poll
+data:
+  OPTION_A: Ansible
+  OPTION_B: Chef
+  OPTION_C: Puppet
+  OPTION_D: SaltStack
+  REDIS_HOST: redis

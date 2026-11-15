@@ -1,0 +1,75 @@
+- name: Check existing server certificate
+  ansible.builtin.stat:
+    path: "{{ registry_cert_dir }}/server.crt"
+  register: registry_server_crt
+
+- name: Generate CA and server certificate
+  when: not registry_server_crt.stat.exists or registry_force_certs | bool
+  notify: Restart zot
+  block:
+    - name: Generate CA key
+      community.crypto.openssl_privatekey:
+        path: "{{ registry_cert_dir }}/ca.key"
+        type: ECC
+        curve: secp256r1
+        mode: "0600"
+        force: "{{ registry_force_certs | bool }}"
+
+    - name: Generate CA CSR
+      community.crypto.openssl_csr_pipe:
+        privatekey_path: "{{ registry_cert_dir }}/ca.key"
+        common_name: bernstein-registry-ca
+        use_common_name_for_san: false
+        basic_constraints: ["CA:TRUE"]
+        basic_constraints_critical: true
+        key_usage: [keyCertSign, cRLSign]
+        key_usage_critical: true
+      register: registry_ca_csr
+
+    - name: Self-sign CA certificate
+      community.crypto.x509_certificate:
+        path: "{{ registry_cert_dir }}/ca.crt"
+        csr_content: "{{ registry_ca_csr.csr }}"
+        privatekey_path: "{{ registry_cert_dir }}/ca.key"
+        provider: selfsigned
+        selfsigned_not_after: "+{{ registry_ca_days }}d"
+        mode: "0644"
+        force: "{{ registry_force_certs | bool }}"
+
+    - name: Generate server key
+      community.crypto.openssl_privatekey:
+        path: "{{ registry_cert_dir }}/server.key"
+        type: ECC
+        curve: secp256r1
+        owner: root
+        group: zot
+        mode: "0640"
+        force: "{{ registry_force_certs | bool }}"
+
+    - name: Generate server CSR
+      community.crypto.openssl_csr_pipe:
+        privatekey_path: "{{ registry_cert_dir }}/server.key"
+        common_name: "{{ registry_host }}"
+        subject_alt_name: >-
+          {{ (['IP:' ~ registry_host] if registry_host is match('^[0-9.]+$') else ['DNS:' ~ registry_host])
+             + (['DNS:' ~ registry_dns] if registry_dns else [])
+             + ['IP:127.0.0.1'] }}
+        basic_constraints: ["CA:FALSE"]
+        basic_constraints_critical: true
+        key_usage: [digitalSignature]
+        key_usage_critical: true
+        extended_key_usage: [serverAuth]
+      register: registry_server_csr
+
+    - name: Sign server certificate with the CA
+      community.crypto.x509_certificate:
+        path: "{{ registry_cert_dir }}/server.crt"
+        csr_content: "{{ registry_server_csr.csr }}"
+        provider: ownca
+        ownca_path: "{{ registry_cert_dir }}/ca.crt"
+        ownca_privatekey_path: "{{ registry_cert_dir }}/ca.key"
+        ownca_not_after: "+{{ registry_cert_days }}d"
+        owner: root
+        group: zot
+        mode: "0644"
+        force: "{{ registry_force_certs | bool }}"

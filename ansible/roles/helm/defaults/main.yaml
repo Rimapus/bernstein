@@ -1,0 +1,4 @@
+---
+helm_version: "v4.3.0"
+helm_sha256: "86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb"
+helm_url: "https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz"

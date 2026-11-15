@@ -1,0 +1,56 @@
+---
+- name: Download the local-path-provisioner manifest
+  ansible.builtin.get_url:
+    url: "{{ storage_local_path_provisioner_manifest_url }}"
+    dest: /etc/kubernetes/local-path-storage.yaml
+    owner: root
+    group: root
+    mode: "0600"
+    checksum: "sha256:{{ storage_local_path_provisioner_manifest_sha256 }}"
+
+- name: Install the local-path-provisioner
+  kubernetes.core.k8s:
+    kubeconfig: /etc/kubernetes/admin.conf
+    src: /etc/kubernetes/local-path-storage.yaml
+    state: present
+
+- name: Mark local-path as the default StorageClass
+  kubernetes.core.k8s:
+    kubeconfig: /etc/kubernetes/admin.conf
+    state: patched
+    definition:
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: local-path
+        annotations:
+          storageclass.kubernetes.io/is-default-class: "true"
+
+- name: Wait for the local-path-provisioner
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - -n
+      - local-path-storage
+      - rollout
+      - status
+      - deployment/local-path-provisioner
+      - --timeout=120s
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  changed_when: false
+
+- name: Check the default StorageClass
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - get
+      - storageclass
+      - local-path
+      - -o
+      - "jsonpath={.metadata.annotations.storageclass\\.kubernetes\\.io/is-default-class}"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: storage_default_class
+  changed_when: false
+  failed_when: storage_default_class.stdout != "true"
